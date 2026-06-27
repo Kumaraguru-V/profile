@@ -340,28 +340,32 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   var group = new THREE.Group();
   scene.add(group);
 
-  var current = new THREE.Color('#C97A3D');
-  var target = new THREE.Color('#C97A3D');
+  var ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+  var directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(8, 12, 10);
+  scene.add(ambientLight, directionalLight);
 
-  var N = 130;
+  var current = new THREE.Color('#4FD8C8');
+  var target = new THREE.Color('#4FD8C8');
+
+  var N = 115;
   var positions = new Float32Array(N*3);
   var pts = [];
   for (var i=0;i<N;i++){
-    var x = (Math.random()-0.5)*34;
-    var y = (Math.random()-0.5)*22;
-    var z = (Math.random()-0.5)*16;
+    var x = (Math.random()-0.5)*30;
+    var y = (Math.random()-0.5)*20;
+    var z = (Math.random()-0.5)*14;
     positions[i*3]=x; positions[i*3+1]=y; positions[i*3+2]=z;
     pts.push(new THREE.Vector3(x,y,z));
   }
   var pGeo = new THREE.BufferGeometry();
   pGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  var pMat = new THREE.PointsMaterial({ color: current, size: 0.22, transparent:true, opacity:0.85 });
+  var pMat = new THREE.PointsMaterial({ color: current, size: 0.22, transparent:true, opacity:0.9 });
   var pointsObj = new THREE.Points(pGeo, pMat);
   group.add(pointsObj);
 
-  // connecting lines for nearby points
   var linePositions = [];
-  var maxDist = 6.2;
+  var maxDist = 5.8;
   for (var a=0;a<N;a++){
     for (var b=a+1;b<N;b++){
       if (pts[a].distanceTo(pts[b]) < maxDist){
@@ -371,9 +375,40 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   }
   var lGeo = new THREE.BufferGeometry();
   lGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(linePositions), 3));
-  var lMat = new THREE.LineBasicMaterial({ color: current, transparent:true, opacity:0.12 });
+  var lMat = new THREE.LineBasicMaterial({ color: current, transparent:true, opacity:0.14 });
   var lines = new THREE.LineSegments(lGeo, lMat);
   group.add(lines);
+
+  function makeBattery(scale){
+    var bodyMat = new THREE.MeshStandardMaterial({ color: '#2CB782', emissive: '#4FD8C8', emissiveIntensity: 0.22, roughness: 0.45, metalness: 0.15 });
+    var accentMat = new THREE.MeshStandardMaterial({ color: '#E8F7EF', emissive: '#4FD8C8', emissiveIntensity: 0.18, roughness: 0.6, metalness: 0.05 });
+    var body = new THREE.Mesh(new THREE.BoxGeometry(1.6*scale, 2.6*scale, 0.32*scale), bodyMat);
+    var cap = new THREE.Mesh(new THREE.BoxGeometry(0.48*scale, 0.42*scale, 0.34*scale), bodyMat);
+    cap.position.y = 1.44*scale;
+    body.add(cap);
+    var cell = new THREE.Mesh(new THREE.BoxGeometry(1.18*scale, 0.9*scale, 0.18*scale), accentMat);
+    cell.position.y = -0.4*scale;
+    body.add(cell);
+    return body;
+  }
+
+  var batteryGroup = new THREE.Group();
+  for (var j=0;j<7;j++){
+    var battery = makeBattery(0.9 + Math.random()*0.22);
+    battery.position.set((Math.random()-0.5)*18, (Math.random()-0.5)*11, (Math.random()-0.5)*6);
+    battery.rotation.y = Math.random()*Math.PI;
+    battery.rotation.x = (Math.random()-0.5)*0.4;
+    batteryGroup.add(battery);
+  }
+  group.add(batteryGroup);
+
+  var ring = new THREE.Mesh(
+    new THREE.RingGeometry(5.8, 6.6, 64),
+    new THREE.MeshBasicMaterial({ color: '#4FD8C8', transparent:true, opacity:0.08, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = Math.PI/2;
+  ring.position.y = -1.8;
+  group.add(ring);
 
   var mouseX=0, mouseY=0, targetRotY=0, targetRotX=0;
   window.addEventListener('mousemove', function(e){
@@ -387,12 +422,16 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
   function animate(){
     requestAnimationFrame(animate);
     group.rotation.y += 0.0009;
-    targetRotY = mouseX*0.4; targetRotX = mouseY*0.25;
+    targetRotY = mouseX*0.4; targetRotX = mouseY*0.22;
     group.rotation.y += (targetRotY - group.rotation.y)*0.01;
     group.rotation.x += (targetRotX - group.rotation.x)*0.01;
     current.lerp(target, 0.03);
     pMat.color.copy(current);
     lMat.color.copy(current);
+    batteryGroup.children.forEach(function(b){
+      if (b.material) b.material.color.copy(current);
+      b.children.forEach(function(child){ if (child.material && child.material.emissive) child.material.emissive.copy(current); });
+    });
     renderer.render(scene, camera);
   }
   animate();
